@@ -129,6 +129,7 @@ reason falls back to exit 1 in both scripts.
 
 | Code | Condition | Exit |
 |---|---|---|
+| `no_earnings_rows` | no earnings row carried a `symbol` (a genuine empty window; an entirely empty calendar response still exits 1 earlier in `main()`, unchanged from before) | 0 |
 | `profiles_budget_exhausted` | budget exhausted (`api_stats["budget_remaining"] == 0` or `rate_limit_reached`) and no profiles were returned at all | 0 |
 | `no_profiles_returned` | ≥1 earnings symbol, but `get_company_profiles` returned nothing | 1 |
 | `profiles_missing_required_field:marketCap` | ≥1 profile came back, but none has a usable numeric `marketCap` (non-bool `int`/`float`, finite) | 1 |

@@ -59,6 +59,10 @@ def normalize_timing(time_value):
 # ZERO_RESULT_REASON -> (exit_code, one-line explanation). Evaluated in
 # `explain_empty_selection` in this fixed order; see docs/dev/provider-contracts.md.
 _ZERO_RESULT_MESSAGES = {
+    "no_earnings_rows": (
+        0,
+        "The earnings calendar carried no rows with a symbol for the lookback window.",
+    ),
     "profiles_budget_exhausted": (
         0,
         "API budget was exhausted before any company profile could be fetched.",
@@ -101,7 +105,8 @@ def explain_empty_selection(earnings, profiles, min_market_cap, api_stats):
     evaluated in the fixed order below (each returns the first matching
     ``ZERO_RESULT_REASON`` code); see docs/dev/provider-contracts.md.
 
-    Codes, in evaluation order: ``profiles_budget_exhausted``,
+    Codes, in evaluation order: ``no_earnings_rows`` (no calendar row carried a
+    symbol -- a genuine empty window), ``profiles_budget_exhausted``,
     ``no_profiles_returned``, ``profiles_missing_required_field:marketCap``,
     ``profiles_missing_required_field:exchange``, ``all_below_market_cap_floor``
     (every usable profile fails the same cap-floor filter),
@@ -112,6 +117,8 @@ def explain_empty_selection(earnings, profiles, min_market_cap, api_stats):
     fallback for a case not covered above.
     """
     symbols = [e.get("symbol") for e in earnings if isinstance(e, dict) and e.get("symbol")]
+    if not symbols:
+        return "no_earnings_rows"
 
     budget_exhausted = api_stats.get("budget_remaining") == 0 or api_stats.get(
         "rate_limit_reached", False

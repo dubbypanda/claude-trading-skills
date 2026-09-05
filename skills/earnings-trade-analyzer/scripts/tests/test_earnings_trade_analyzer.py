@@ -391,6 +391,16 @@ class TestExplainEmptySelection:
         reason = explain_empty_selection(earnings, profiles, 2e9, self._api_stats())
         assert reason == "mixed_filters_rejected_all"
 
+    def test_no_earnings_rows_is_benign_empty_window(self):
+        """Rows without a symbol (or no rows at all) are a genuine empty window:
+        exit 0, never the fail-closed ``unknown`` fallback (PR #353 review)."""
+        assert explain_empty_selection([], {}, 2e9, self._api_stats()) == "no_earnings_rows"
+        rows_without_symbol = [{"date": "2026-09-04", "time": "amc"}]
+        assert (
+            explain_empty_selection(rows_without_symbol, {}, 2e9, self._api_stats())
+            == "no_earnings_rows"
+        )
+
     def test_fixture_select_candidates_yields_one_then_zero_on_rename(self):
         """D4: pin select_candidates + explain_empty_selection against the live fixture."""
         candidates = select_candidates(self.FIXTURE_EARNINGS, {"AAPL": self.FIXTURE_PROFILE}, 2e9)
@@ -528,6 +538,26 @@ class TestMainZeroResultExitCodes:
         assert exc_info.value.code == 0
         err = capsys.readouterr().err
         assert "ZERO_RESULT_REASON=all_non_us_exchange" in err
+
+    @patch("analyze_earnings_trades.FMPClient")
+    def test_no_earnings_rows_exits_0(self, mock_client_class, tmp_path, capsys):
+        """Calendar rows that carry no symbol reach the zero-result path and exit 0."""
+        client = mock_client_class.return_value
+        mock_client_class.US_EXCHANGES = FMPClient.US_EXCHANGES
+        client.get_earnings_calendar.return_value = [{"date": "2026-09-04", "time": "amc"}]
+        client.get_company_profiles.return_value = {}
+        client.get_api_stats.return_value = {
+            "budget_remaining": 50,
+            "rate_limit_reached": False,
+        }
+
+        with patch.object(sys, "argv", self._argv(tmp_path)):
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+
+        assert exc_info.value.code == 0
+        err = capsys.readouterr().err
+        assert "ZERO_RESULT_REASON=no_earnings_rows" in err
 
     @patch("analyze_earnings_trades.FMPClient")
     def test_mixed_filters_rejected_all_exits_0(self, mock_client_class, tmp_path, capsys):
