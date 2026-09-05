@@ -187,6 +187,14 @@ jobs:
       - name: FMP client drift check
         run: python3 scripts/generate_fmp_client.py --check
 
+      # 5b. Provider response contract check (Issue #332): validates
+      # config/provider-contracts/fmp/*.v*.json structure + fixtures against
+      # the generated fmp_client.py owners in skills-index.yaml. Offline —
+      # no `requests` import at module top, so this runs fine in this job's
+      # pyyaml + packaging install.
+      - name: Provider contract check
+        run: python3 scripts/check_provider_contracts.py check
+
       - name: Shared market calendar drift check
         run: python3 scripts/generate_market_calendar.py --check
 

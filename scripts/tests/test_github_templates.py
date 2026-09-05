@@ -264,6 +264,7 @@ def test_pull_request_template_matches_local_and_ci_gates() -> None:
         "python3 scripts/generate_fmp_client.py --check",
         "python3 scripts/check_package_drift_for_changed_skills.py",
         FMP_PACKAGE_DRIFT_COMMAND,
+        "python3 scripts/check_provider_contracts.py check",
     ]
     for command in required_commands:
         assert command in template, command
