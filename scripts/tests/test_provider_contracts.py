@@ -322,6 +322,62 @@ def test_family_b_client_earnings_calendar_accepts_fixture(skill, monkeypatch):
             assert f in row
 
 
+@pytest.mark.parametrize("skill", FAMILY_B_SKILLS)
+def test_family_b_client_earnings_calendar_requests_report_times(skill, monkeypatch):
+    """Issue #352: the client must ask for includeReportTimes=true (a string,
+    not a JSON boolean) so the provider includes the `time` (bmo/amc/null)
+    field on each row."""
+    monkeypatch.setenv("FMP_API_KEY", "test_key")  # pragma: allowlist secret
+    mod = _load_client_module(f"skills/{skill}/scripts/fmp_client.py")
+    client = mod.FMPClient(api_key="test_key")  # pragma: allowlist secret
+
+    captured = {}
+
+    def fake_get(url, params=None, **kwargs):
+        captured["url"] = url
+        captured["params"] = params
+        return copy.deepcopy(EARNINGS_FIXTURE)
+
+    monkeypatch.setattr(client, "_rate_limited_get", fake_get)
+
+    client.get_earnings_calendar("2026-09-04", "2026-09-04")
+
+    assert captured["params"]["includeReportTimes"] == "true"
+
+
+def test_earnings_calendar_fixture_rows_carry_time_field():
+    """Issue #352: the recorded fixture must reflect includeReportTimes=true
+    responses (time present as bmo/amc/None), not the pre-#352 shape."""
+    for row in EARNINGS_FIXTURE:
+        assert "time" in row
+
+
+def test_earnings_calendar_fixture_covers_bmo_amc_and_null_timing():
+    times = {row.get("time") for row in EARNINGS_FIXTURE}
+    assert {"bmo", "amc", None} <= times
+
+
+def test_earnings_calendar_missing_time_field_is_a_fatal_regression():
+    """A response missing `time` entirely (e.g. includeReportTimes dropped
+    again) must be caught as missing_required_field, not silently accepted."""
+    contract = CONTRACTS["earnings-calendar"]
+    row = copy.deepcopy(contract.fixture[0])
+    del row["time"]
+    result = validate_rows(contract, [row])
+    assert result.ok is False
+    assert any(a.code == "missing_required_field:time" for a in result.fatal_anomalies)
+
+
+def test_earnings_calendar_query_values_are_all_strings():
+    """check_provider_contracts.py sends `dict(contract.query)` straight into
+    requests' `params=`; a JSON boolean for includeReportTimes would be sent
+    as Python `True`, which the API rejects with HTTP 400 (only the strings
+    "true"/"false" are accepted)."""
+    contract = CONTRACTS["earnings-calendar"]
+    for key, value in contract.query.items():
+        assert isinstance(value, str), f"{key}={value!r} is not a str"
+
+
 # --- specials: canslim, macro, market-top, us-undervalued-growth-screener ---
 
 

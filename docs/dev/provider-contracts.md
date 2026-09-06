@@ -60,7 +60,7 @@ Location follows `config/ci-test-policy.yaml`'s convention: data lives under
     "mktCap": {"canonical": "marketCap"},
     "exchangeShortName": {"canonical": "exchange"}
   },
-  "known_gaps": [{"field": "time", "issue": 352, "note": "..."}],
+  "known_gaps": [],
   "non_empty": {"min_rows": 1, "reason": "AAPL profile must never be empty"},
   "fixture": [{"...sanitized real rows...": true}]
 }
@@ -80,7 +80,9 @@ Field semantics:
   canonical one, the provider silently reverted or the endpoint changed shape.
 - **`known_gaps`** — a documented, accepted gap between what the provider *used to*
   return (v3) and what `/stable` returns now, each tied to a follow-up issue number.
-  Only `earnings-calendar` carries one in slice 1 (see below).
+  Currently empty across all contracts; only `earnings-calendar` is allowed to
+  carry entries here (it previously recorded #352 — the `time` field — until
+  `includeReportTimes=true` restored it, see below).
 - **`non_empty`** — `min_rows` is the floor below which an empty/`None` response is
   itself an anomaly (`empty_response`), not just a shape mismatch.
 - **`fixture`** — real (sanitized) rows recorded live on `recorded_on`. Rules
@@ -93,7 +95,10 @@ Field semantics:
 **Versioning rule:** `contract_version` bumps only on a breaking change (a
 required field removed, renamed, or its type narrowed/changed). Adding a new
 `optional_fields` entry, widening a type set, or marking a field newly nullable is
-non-breaking and does not bump the version.
+non-breaking and does not bump the version. Adding a **new** required field that
+consumers start reading (e.g. `time` after #352) is consumer-compatible and does
+not bump the version; it tightens the canary only. If the addition needs a new
+query parameter, record it in `query` so the canary requests the same shape.
 
 ## Anomaly / severity table
 
@@ -197,18 +202,28 @@ weekly canary via the `earnings-calendar` `non_empty` contract. Session-aware
 suspicion is tracked as follow-up work in
 [Issue #356](https://github.com/tradermonty/claude-trading-skills/issues/356).
 
-## Follow-up issue: `earnings-calendar` has no `time` field
+## Follow-up issue: `earnings-calendar` `time` field — resolved (2026-09-06)
 
-Verified live 2026-09-05: `/stable/earnings-calendar` does not return a `time`
-field. The legacy v3 `earning_calendar` endpoint carried `time` (`bmo` / `amc` —
-before/after market open/close), which `earnings-trade-analyzer` and
-`pead-screener` used for timing logic; on `/stable` that information is simply
-gone, so any gap-direction or pre/post-earnings timing calculation derived from it
-is now unknown rather than wrong. Tracked as
-[Issue #352](https://github.com/tradermonty/claude-trading-skills/issues/352) and
-recorded in `earnings-calendar.v1.json`'s `known_gaps`. Fixing the gap (e.g. via a
-different endpoint, or documenting the timing calculation as best-effort) is out of
-scope for this slice.
+Previously (verified live 2026-09-05): `/stable/earnings-calendar` with no query
+parameters did not return a `time` field, unlike the legacy v3 `earning_calendar`
+endpoint (`bmo` / `amc` — before/after market open/close), which
+`earnings-trade-analyzer` and `pead-screener` used for timing logic.
+
+Verified live 2026-09-06: the field is not gone — it is gated behind the
+`includeReportTimes=true` query parameter (the value must be the literal string
+`"true"` or `"false"`; any other value, including a JSON boolean, is HTTP 400).
+With that parameter, `/stable/earnings-calendar` returns `time` as `"bmo"`,
+`"amc"`, or `null`, plus `periodEnding`, `fiscalPeriod`, `fiscalYear`, and
+`confirmed`. About one third of rows on a typical trading day still carry
+`null` (the provider has not confirmed a session for that report), so
+`unknown` remains a real, expected outcome downstream — it is now backed by an
+explicit `null` from the provider rather than an always-missing key.
+[Issue #352](https://github.com/tradermonty/claude-trading-skills/issues/352) is
+resolved: the client template requests `includeReportTimes=true`,
+`earnings-calendar.v1.json` requires `time` (nullable) with an empty
+`known_gaps`, and `earnings-trade-analyzer` / `pead-screener` report a
+`timing_unknown_count` alongside their results so the residual `null` rate is
+visible rather than silently assumed away.
 
 ## Manual fixture refresh procedure
 
@@ -222,6 +237,17 @@ curl --get "https://financialmodelingprep.com/stable/profile" \
   --data-urlencode "symbol=AAPL" \
   --data-urlencode "apikey=$FMP_API_KEY" \
   | jq 'if type == "array" then map(del(.description, .website, .image, .ceo, .phone, .address, .city, .state, .zip)) else . end'
+```
+
+For `earnings-calendar`, the `includeReportTimes=true` query parameter is
+required to get the `time` field at all (see above):
+
+```bash
+curl --get "https://financialmodelingprep.com/stable/earnings-calendar" \
+  --data-urlencode "from=2026-09-04" \
+  --data-urlencode "to=2026-09-04" \
+  --data-urlencode "includeReportTimes=true" \
+  --data-urlencode "apikey=$FMP_API_KEY"
 ```
 
 Sanitization checklist before pasting the result into a `fixture` array:
