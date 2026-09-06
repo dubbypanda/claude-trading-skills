@@ -282,6 +282,32 @@ PR on it) is explicitly deferred — see "Out of scope" below and the plan's
 resolved review notes. Promote only after a period of the canary running green
 (or with well-understood/acceptable anomalies) with no false positives.
 
+### Generated client stderr redaction (#357)
+
+The redaction above covers only the canary CLI. All 10 vendored `fmp_client.py`
+files (rendered from `scripts/fmp_client/core_template.py.tmpl` and the four
+`scripts/fmp_client/specials/*.py.tmpl`) mask `apikey=`/`api_key=` at every site
+that can echo provider text. The nine clients rendered from
+`core_template.py.tmpl`, `canslim.py.tmpl`, `macro.py.tmpl`, and
+`market_top.py.tmpl` mask a non-200 HTTP response body and a
+`requests.exceptions.RequestException` message before storing it in
+`self._last_error` (the six core-family clients only) and before printing it
+to stderr. The GARP client (`us-undervalued-growth-screener`) never reads
+`response.text` on a non-200 response — its non-200 `WARN` lines only
+interpolate the request `url`, which never carries the key since the client
+injects `apikey` into the request `params` dict rather than the `url` string
+— so it instead masks its request-exception `{exc}` interpolation and, for
+future-proofing, the `url` interpolation in every other `WARN` line, even
+though none of them can carry the key today. Because generated clients are
+vendored standalone (packaged without `scripts/`), they cannot import
+`scripts.provider_contracts.redact_url()`; each template instead carries a
+verbatim, module-level mirror (`_APIKEY_RE` + `_redact_key()`) with a comment
+naming that function as the source of truth. `scripts/tests/test_generate_fmp_client.py`
+asserts the regex literal is identical across all five templates' rendered
+output, so the five copies cannot silently drift apart, and
+`scripts/tests/test_fmp_client_redaction.py` exercises all 10 vendored clients
+at runtime to confirm a fake key never reaches stdout or stderr.
+
 ## FMP endpoint inventory (`/stable/...` paths found in `skills/*/scripts`)
 
 Discovered via `grep -rhoE '/stable/[A-Za-z0-9_/-]+' skills/*/scripts`. `/stable/x`

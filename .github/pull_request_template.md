@@ -43,7 +43,7 @@ Mark non-applicable items as N/A and explain them under reviewer notes. / 非該
 - [ ] FMP package mirrors passed the repository CI command below. / FMP package mirrorのdriftを確認しました。
 
 ```bash
-python3 scripts/package_skills.py --check --skill pead-screener --skill earnings-trade-analyzer --skill ibd-distribution-day-monitor --skill vcp-screener --skill parabolic-short-trade-planner --skill ftd-detector --skill canslim-screener --skill macro-regime-detector --skill market-top-detector
+python3 scripts/package_skills.py --check --skill pead-screener --skill earnings-trade-analyzer --skill ibd-distribution-day-monitor --skill vcp-screener --skill parabolic-short-trade-planner --skill ftd-detector --skill canslim-screener --skill macro-regime-detector --skill market-top-detector --skill us-undervalued-growth-screener
 ```
 
 ## Reviewer notes and N/A reasons / レビュー補足・N/A理由
