@@ -148,6 +148,7 @@ when `candidates` is non-empty):
 | Code | Condition | Exit | Level |
 |---|---|---|---|
 | `no_earnings_rows` | Mode A: the FMP earnings calendar returned no rows (or no rows carried a `symbol`) for the lookback window | 0 | WARNING |
+| `calendar_fetch_failed` | Mode A: the calendar fetch returned no usable body (`None` on transport/HTTP/rate-limit failure, or a non-list body); non-dict rows are ignored, never dereferenced | 1 | ERROR |
 | `profiles_budget_exhausted` | Mode A: profiles came back empty and the budget is exhausted (`budget_remaining == 0` or `rate_limit_reached`) | 0 | WARNING |
 | `no_profiles_returned` | Mode A: ≥1 symbol, but `get_company_profiles` returned nothing and the budget is not exhausted | 1 | ERROR |
 | `profiles_missing_required_field:marketCap` | Mode A: no candidate passed the cap filter **and** no profile has a coercible `marketCap` *or* `mktCap` — see the value-based nuance below | 1 | ERROR |

@@ -448,6 +448,26 @@ class TestMainZeroResultExitCodes:
         ]
 
     @patch("analyze_earnings_trades.FMPClient")
+    def test_malformed_rows_are_ignored_not_crash(self, mock_client_class, tmp_path, capsys):
+        """Non-dict calendar rows are never dereferenced; symbols-empty stays benign."""
+        client = mock_client_class.return_value
+        mock_client_class.US_EXCHANGES = FMPClient.US_EXCHANGES
+        client.get_earnings_calendar.return_value = ["x", None, {"foo": 1}]
+        client.get_company_profiles.return_value = {}
+        client.get_api_stats.return_value = {
+            "budget_remaining": 50,
+            "rate_limit_reached": False,
+        }
+
+        with patch.object(sys, "argv", self._argv(tmp_path)):
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+
+        assert exc_info.value.code == 0
+        err = capsys.readouterr().err
+        assert "ZERO_RESULT_REASON=no_earnings_rows" in err
+
+    @patch("analyze_earnings_trades.FMPClient")
     def test_no_profiles_returned_exits_1(self, mock_client_class, tmp_path, capsys):
         client = mock_client_class.return_value
         mock_client_class.US_EXCHANGES = FMPClient.US_EXCHANGES

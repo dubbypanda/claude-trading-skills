@@ -27,6 +27,7 @@ from fmp_client import ApiCallBudgetExceeded, FMPClient
 from report_generator import generate_json_report, generate_markdown_report
 from scorer import COMPONENT_WEIGHTS, calculate_composite_score
 from screen_pead import (
+    _ZERO_RESULT_REASONS,
     _get_candidates_mode_a,
     _get_candidates_mode_b,
     analyze_stock,
@@ -1518,6 +1519,31 @@ class TestModeAZeroResultReasons:
     def test_no_earnings_rows_when_no_symbols(self):
         client = MagicMock()
         client.get_earnings_calendar.return_value = [{"date": "2026-09-03", "time": "amc"}]
+        result, reason = _get_candidates_mode_a(client, self._args())
+        assert result == []
+        assert reason == "no_earnings_rows"
+
+    def test_calendar_fetch_failed_when_calendar_is_none(self):
+        """A failed fetch (None body) must not look like a quiet day."""
+        client = MagicMock()
+        client.get_earnings_calendar.return_value = None
+        result, reason = _get_candidates_mode_a(client, self._args())
+        assert result == []
+        assert reason == "calendar_fetch_failed"
+        exit_code, level, _ = _ZERO_RESULT_REASONS[reason]
+        assert (exit_code, level) == (1, "ERROR")
+
+    def test_calendar_fetch_failed_when_calendar_is_non_list(self):
+        client = MagicMock()
+        client.get_earnings_calendar.return_value = {"error": "Bad Request"}
+        result, reason = _get_candidates_mode_a(client, self._args())
+        assert result == []
+        assert reason == "calendar_fetch_failed"
+
+    def test_malformed_rows_are_ignored_not_crash(self):
+        """Non-dict rows are never dereferenced; symbols-empty stays benign."""
+        client = MagicMock()
+        client.get_earnings_calendar.return_value = ["x", None, {"foo": 1}]
         result, reason = _get_candidates_mode_a(client, self._args())
         assert result == []
         assert reason == "no_earnings_rows"
