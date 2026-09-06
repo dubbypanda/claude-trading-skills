@@ -649,6 +649,12 @@ _ZERO_RESULT_REASONS = {
         "WARNING",
         "The FMP earnings calendar returned no rows for the selected date range.",
     ),
+    "calendar_fetch_failed": (
+        1,
+        "ERROR",
+        "The earnings calendar fetch failed (no usable response body); "
+        "the provider may be down or the response shape may have changed.",
+    ),
     "profiles_budget_exhausted": (
         0,
         "WARNING",
@@ -693,14 +699,19 @@ def _get_candidates_mode_a(client: FMPClient, args) -> tuple[list[dict], Optiona
     print(f"  Fetching earnings calendar: {from_date} to {to_date}")
 
     earnings = client.get_earnings_calendar(from_date, to_date)
+    if not isinstance(earnings, list):
+        print("  ERROR: Earnings calendar fetch failed (no usable response body)")
+        return [], "calendar_fetch_failed"
     if not earnings:
         print("  WARNING: No earnings data returned")
         return [], "no_earnings_rows"
 
     print(f"  Raw earnings events: {len(earnings)}")
 
-    # Get unique symbols
-    symbols = list(set(e.get("symbol", "") for e in earnings if e.get("symbol")))
+    # Get unique symbols (non-dict rows are ignored, never dereferenced).
+    symbols = list(
+        set(e.get("symbol", "") for e in earnings if isinstance(e, dict) and e.get("symbol"))
+    )
     if not symbols:
         return [], "no_earnings_rows"
 
@@ -716,7 +727,7 @@ def _get_candidates_mode_a(client: FMPClient, args) -> tuple[list[dict], Optiona
 
     # Build candidates with market cap filter (gap filter deferred to Phase 2
     # where actual price data is available for accurate gap calculation)
-    grade_map = {e.get("symbol"): e for e in earnings}
+    grade_map = {e.get("symbol"): e for e in earnings if isinstance(e, dict)}
     candidates = []
     any_usable_cap = False
 

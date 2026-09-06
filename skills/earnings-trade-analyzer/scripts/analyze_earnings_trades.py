@@ -371,8 +371,10 @@ def main():
 
     print(f"Raw earnings announcements: {len(earnings)}", file=sys.stderr)
 
-    # Get unique symbols
-    symbols = list(set(e.get("symbol") for e in earnings if e.get("symbol")))
+    # Get unique symbols (non-dict rows are ignored, never dereferenced).
+    symbols = list(
+        set(e.get("symbol") for e in earnings if isinstance(e, dict) and e.get("symbol"))
+    )
     print(f"Unique symbols: {len(symbols)}", file=sys.stderr)
 
     # Fetch profiles in batch
