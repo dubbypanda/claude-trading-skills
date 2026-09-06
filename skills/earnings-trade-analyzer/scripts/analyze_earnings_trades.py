@@ -423,6 +423,11 @@ def main():
             file=sys.stderr,
         )
 
+    # Timing diagnostics (Issue #352): count over the population that actually
+    # reaches analysis (post market-cap trim), not the raw calendar row count.
+    timing_candidates_total = len(candidates)
+    timing_unknown_count = sum(1 for c in candidates if c.get("earnings_timing") == "unknown")
+
     # Phase 2: Fetch historical prices
     print("\n--- Phase 2: Fetch Historical Prices ---", file=sys.stderr)
 
@@ -530,6 +535,9 @@ def main():
         "min_gap": args.min_gap,
         "entry_filter_applied": args.apply_entry_filter,
         "api_stats": api_stats,
+        "timing_unknown_count": timing_unknown_count,
+        "timing_candidates_total": timing_candidates_total,
+        "timing_source": "fmp_stable_includeReportTimes",
     }
 
     os.makedirs(args.output_dir, exist_ok=True)
